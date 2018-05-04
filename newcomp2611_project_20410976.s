@@ -1,4 +1,4 @@
-# Wang Yufei 20410976 ywanghs@connect.ust.hk
+ # Wang Yufei 20410976 ywanghs@connect.ust.hk
 .data
 
 
@@ -949,20 +949,22 @@ process_quiz_input:
 
   la $t0, quiz_answer # check correctness of selected choice
   lw $t0, 0($t0)
-  beq $t0, $t1, teleport_pacman # selected choice is correct answer 
-  #la $t0, lives
-  #lw $a0, 0($t0)
-  #addi $a0, $a0, -1 # decrease one life
-  #sw $a0, 0($t0)
+  
+  bne $t0, $t1, pqi_next
+
+  jal teleport_pacman
+    j pqi_exit
+pqi_next:
+  la $t0, lives
+  lw $a0, 0($t0)
+  addi $a0, $a0, -1 # decrease one life
+  sw $a0, 0($t0)
   blez $a0, pqi_exit
 
   li $a0, 2 
   li $a1, 0
   li $v0, 202 # play the sound of losing life
   syscall
-  jal pqi_shield
-  j pqi_exit
-
 pqi_shield:   
   la $t0, shield_time_limit # trigger Shield mode
   lw $t0, 0($t0)
@@ -1074,7 +1076,7 @@ mp2u_check_path:
   lw $t1, ($t1)
   sgt $t0, $t0, 0
   and $t0, $t1, $t0
-  bne $t0, $z
+  bne $t0, $zero, mp2u_no_move
   beq $a0, $zero, mp2u_save_yloc
   
   
@@ -1181,7 +1183,16 @@ move_pacman2_down:
     li $s1, 0
     j mp2d_save_yloc
 
-mp2d_check_path: beq $a0, $zero, mp2d_save_yloc
+mp2d_check_path: 
+
+  la $t0, shield_time
+  la $t1, pacman_contact
+  lw $t0, ($t0)
+  lw $t1, ($t1)
+  sgt $t0, $t0, 0
+  and $t0, $t1, $t0
+  bne $t0, $zero, mp2d_no_move
+beq $a0, $zero, mp2d_save_yloc
     # check whether pacman's bottom-left corner is in a wall
     add $a1, $s1, $s4 
     addi $a1, $a1, -1 # y-coordinate of pacman's bottom corners 
@@ -1281,7 +1292,16 @@ move_pacman2_left:
     sub $s0, $t2, $s3
     j mp2l_save_xloc
 
-mp2l_check_path: beq $a0, $zero, mp2l_save_xloc
+mp2l_check_path: 
+
+  la $t0, shield_time
+  la $t1, pacman_contact
+  lw $t0, ($t0)
+  lw $t1, ($t1)
+  sgt $t0, $t0, 0
+  and $t0, $t1, $t0
+  bne $t0, $zero, mp2l_no_move
+beq $a0, $zero, mp2l_save_xloc
     # check whether pacman's top-left corner is in a wall 
     addi $a0, $s0, 0
     addi $a1, $s1, 0
@@ -1380,7 +1400,16 @@ move_pacman2_right:
     li $s0, 0
     j mp2r_save_xloc
 
-mp2r_check_path: beq $a0, $zero, mp2r_save_xloc
+mp2r_check_path: 
+
+  la $t0, shield_time
+  la $t1, pacman_contact
+  lw $t0, ($t0)
+  lw $t1, ($t1)
+  sgt $t0, $t0, 0
+  and $t0, $t1, $t0
+  bne $t0, $zero, mp2r_no_move
+beq $a0, $zero, mp2r_save_xloc
     # check whether pacman's top-right corner is in a wall
     add $a0, $s0, $s3 
     addi $a0, $a0, -1 # x-coordinate of pacman's right corners 
