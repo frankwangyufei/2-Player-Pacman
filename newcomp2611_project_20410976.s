@@ -22,7 +22,13 @@ game_score2: .word 0
 lives: .word 100
 lives_text_3: .asciiz "Player 2, Score:           "
 game_level: .word 1 # level of the game, initilized to be 1
-game_win_text:  .asciiz "You Win! Enjoy the game brought by COMP2611!"
+game_win_text1:  .asciiz "Player 1 score:          "
+game_win_text2:  .asciiz "Player 2 score:          "
+game_win_text3:  .asciiz "Player 1 wins!"
+game_win_text4:  .asciiz "Player 2 wins!"
+game_win_text5:  .asciiz "Enjoy the game by Frank for comp2611!"
+
+game_win_text6:  .asciiz "Draw!"
 game_lose_text: .asciiz "Try to improve your skill in the next trial!"
 input_ghost:  .asciiz "Enter the number of ghosts (in the range [1, 5]): "
 
@@ -82,7 +88,8 @@ quiz_alert_time:  .word 200 # the remaining time of the Quiz mode at which the p
 shield_alert_time:  .word 100 # the remaining time of the Shield mode at which the player will be alerted about the mode near its expiration. 
 initial_move_iteration: .word 10 # default number of game iterations for a pacman movement
 
-
+player1_score1: .word 0
+player2_score1: .word 0
 
 buffer: .space 32
 
@@ -283,7 +290,15 @@ check_level_end:
   beq $t3, $t2, cle_win # winning at level 2 means winning the game
   # Winning at lower level, so advance game to the next level
   addi $t3, $t3, 1
-  sw $t3, 0($t0) 
+  sw $t3, 0($t0)
+  la $t0, player1_score1
+  la $t1, game_score
+  lw $t1, ($t1)
+  sw $t1, ($t0) 
+  la $t0, player2_score1
+  la $t1, game_score2
+  lw $t1, ($t1)
+  sw $t1, ($t0)
   li $a0, 4 # play the sound of passing a game level
   li $a1, 0
   li $v0, 202
@@ -308,10 +323,78 @@ cle_win:
   li $a1, 0
   li $v0, 202
   syscall
-  la $a3, game_win_text # display game winning message 
+  
+  li $v0, 207 # create object of the game winning or losing message 
+  
+  la $a3, game_score # display game winning message 
+  lw $a3, ($a3)
+  la $t0, player1_score1
+  lw $t0, ($t0)
+  add $a0, $a3, $t0
+  addi $s0, $a0, 0
+  la $a1, game_win_text1
+  addi $a1, $a1, 16
+  jal ItoA
+  li $v0, 207
+  la $a3, game_win_text1 # display game winning message 
   li $a0, -2 # special ID for this text object
   addi $a1, $zero, 40 # display the message at coordinate (40, 300)
   addi $a2, $zero, 300  
+  li $a0, -3 # special ID for this text object
+  addi $a1, $zero, 40 # display the message at coordinate (40, 300)
+  addi $a2, $zero, 300  
+  syscall
+  
+  la $a3, game_score2 # display game winning message 
+  lw $a3, ($a3)
+  la $t0, player2_score1
+  lw $t0, ($t0)
+  add $a0, $a3, $t0
+  
+  addi $s1, $a0, 0
+  la $a1, game_win_text2
+  addi $a1, $a1, 16
+  jal ItoA
+  li $v0, 207
+  la $a3, game_win_text2 # display game winning message 
+  li $a0, -4 # special ID for this text object
+  addi $a1, $zero, 350 # display the message at coordinate (40, 300)
+  addi $a2, $zero, 300  
+  syscall
+  
+  beq $s0, $s1, cle_draw
+  bgt $s0, $s1, cle_p1
+  cle_p2:
+  
+  li $v0, 207
+  la $a3, game_win_text4 # display game winning message 
+  li $a0, -5 # special ID for this text object
+  addi $a1, $zero, 250 # display the message at coordinate (40, 300)
+  addi $a2, $zero, 350  
+  syscall
+  j cle_next
+  cle_draw:
+  
+  li $v0, 207
+  la $a3, game_win_text6 # display game winning message 
+  li $a0, -5 # special ID for this text object
+  addi $a1, $zero, 280 # display the message at coordinate (40, 300)
+  addi $a2, $zero, 350  
+  syscall
+  j cle_next
+  cle_p1:
+  li $v0, 207
+  la $a3, game_win_text3 # display game winning message 
+  li $a0, -5 # special ID for this text object
+  addi $a1, $zero, 250 # display the message at coordinate (40, 300)
+  addi $a2, $zero, 350  
+  syscall
+  
+  cle_next:
+  la $a3, game_win_text5 # display game winning message 
+  li $a0, -6 # special ID for this text object
+  addi $a1, $zero, 40 # display the message at coordinate (40, 300)
+  addi $a2, $zero, 400  
 cle_end_game:
   li $v0, 207 # create object of the game winning or losing message 
   syscall 
