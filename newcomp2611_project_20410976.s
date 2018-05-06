@@ -267,10 +267,10 @@ check_level_end:
   sw $ra, 0($sp)
 
   li $v0, 0
-  la $t0, lives # check number of remaining lives
-  lw $t0, 0($t0)
-  blez $t0, cle_lose # game remaining lives <= 0
-
+#  la $t0, lives # check number of remaining lives
+ # lw $t0, 0($t0)
+ # blez $t0, cle_lose # game remaining lives <= 0
+#
   la $t0, remaining_sp_num
   lw $t0, 0($t0)
   bgtz $t0, cle_exit # some more score points existed, so continue game level
@@ -362,9 +362,13 @@ init_game_level:
 
   la $t0, move_iteration
   sw $zero, 0($t0) # reset any last movement of pacman
+  la $t0, move_iteration2
+  sw $zero, 0($t0) # reset any last movement of pacman
   la $t0, buffered_move_key
   sw $zero, 0($t0) # reset latest buffered movement input of pacman
-
+  la $t0, buffered_move_key2
+  sw $zero, 0($t0) # reset latest buffered movement input of pacman
+  
   la $t0, shield_time
   lw $t1, 0($t0) # remaining time of Shield mode
   beq $t1, $zero, igl_start
@@ -380,6 +384,9 @@ igl_start:
   syscall 
   
   la $t0, initial_game_score # initialize game score
+  lw $a0, 0($t0)
+  la $t0, game_score2
+  sw $a0, 0($t0)
   lw $a0, 0($t0)
   la $t0, game_score
   sw $a0, 0($t0)
@@ -876,7 +883,7 @@ pmi2_start_move:
   j pmi2_check
 pmi2_check_buffer:
   li $a0, 1 # check whether this movement can actually move the pacman object
-  la $t0, buffered_move_key
+  la $t0, buffered_move_key2
   lw $t9, 0($t0) # check whether buffered movement input is valid
   sw $zero, 0($t0) # reset buffer
   li $t0, 105 # corresponds to key 'i'
@@ -951,8 +958,16 @@ process_quiz_input:
   lw $t0, 0($t0)
   
   bne $t0, $t1, pqi_next
-
+  la $t0, pacman_contact
+  lw $t0, ($t0)
+  beq $t0, 1, pqi_teleport_pacman2
+pqi_teleport_pacman1:
   jal teleport_pacman
+  j pqi_teleport_exit
+pqi_teleport_pacman2:
+
+  jal teleport_pacman2
+pqi_teleport_exit:
     j pqi_exit
 pqi_next:
   la $t0, lives
@@ -1029,6 +1044,49 @@ tp_new_loc: # get a new pacman location and check its validity
   addi $sp, $sp, 16
   jr $ra
 
+
+teleport_pacman2:
+  addi $sp, $sp, -16
+  sw $ra, 0($sp)
+  sw $s0, 4($sp)
+  sw $s1, 8($sp)
+  sw $s2, 12($sp)
+
+  la $s0, pacman2_locs
+  la $t0, scorepoint_num 
+  lw $s1, 0($t0) # num of score point objects
+  la $t0, scorepoint_base
+  lw $s2, 0($t0)
+  addi $s2, $s2, -1 # create a non-existing id of a score point object
+
+  la $t0, move_iteration2
+  sw $zero, 0($t0) # stop any in-progress pacman movement
+  la $t0, buffered_move_key
+  sw $zero, 0($t0) # reset any buffered movement key
+
+tp2_new_loc: # get a new pacman location and check its validity
+  li $v0, 209 # get random path location
+  syscall
+  sw $v0, 0($s0) # save new x_loc first
+  sw $v1, 4($s0) # save new y_loc first
+  jal check_ghost_collisions
+  bne $v0, $zero, tp2_new_loc # collision with a ghost
+
+  la $t0, pacman2_id
+  lw $a0, 0($t0)
+  lw $a1, 0($s0)
+  lw $a2, 4($s0)
+  li $a3, 1 # object type
+  li $v0, 206
+  syscall # set new object location
+  
+  lw $ra, 0($sp)
+  lw $s0, 4($sp)
+  lw $s1, 8($sp)
+  lw $s2, 12($sp)
+  addi $sp, $sp, 16
+  jr $ra
+
 #--------------------------------------------------------------------
 # procedure: move_pacman_up(check_validity)
 # Move the pacman object upward by one step which is its speed.
@@ -1070,14 +1128,17 @@ move_pacman2_up:
   j mp2u_save_yloc
 
 mp2u_check_path: 
+  beq $a0, $zero, mp2u_save_yloc
   la $t0, shield_time
   la $t1, pacman_contact
   lw $t0, ($t0)
   lw $t1, ($t1)
+  la $t3, shield_alert_time
+  lw $t3, ($t3)
+  sub $t0, $t0, $t3
   sgt $t0, $t0, 0
   and $t0, $t1, $t0
   bne $t0, $zero, mp2u_no_move
-  beq $a0, $zero, mp2u_save_yloc
   
   
   # check whether pacman's top-left corner is in a wall
@@ -1117,6 +1178,10 @@ mp2u_check_path:
     sw $t5, ($sp)
     jal check_intersection
     addi $sp, $sp, 32
+    la $t0, shield_time
+    lw $t0, ($t0)
+    seq $t0, $t0, 0
+    and $v0, $v0, $t0
     bne $v0, $zero, mp2u_no_move
 
 mp2u_save_yloc:  sw $s1, 4($s2) # save new y_loc
@@ -1184,15 +1249,18 @@ move_pacman2_down:
     j mp2d_save_yloc
 
 mp2d_check_path: 
+beq $a0, $zero, mp2d_save_yloc
 
   la $t0, shield_time
   la $t1, pacman_contact
   lw $t0, ($t0)
   lw $t1, ($t1)
+  la $t3, shield_alert_time
+  lw $t3, ($t3)
+  sub $t0, $t0, $t3
   sgt $t0, $t0, 0
   and $t0, $t1, $t0
   bne $t0, $zero, mp2d_no_move
-beq $a0, $zero, mp2d_save_yloc
     # check whether pacman's bottom-left corner is in a wall
     add $a1, $s1, $s4 
     addi $a1, $a1, -1 # y-coordinate of pacman's bottom corners 
@@ -1229,6 +1297,10 @@ beq $a0, $zero, mp2d_save_yloc
     sw $t5, ($sp)
     jal check_intersection
     addi $sp, $sp, 32
+    la $t0, shield_time
+    lw $t0, ($t0)
+    seq $t0, $t0, 0
+    and $v0, $v0, $t0
     bne $v0, $zero, mp2d_no_move
 
 mp2d_save_yloc:  sw $s1, 4($s2) # save new y_loc
@@ -1293,15 +1365,21 @@ move_pacman2_left:
     j mp2l_save_xloc
 
 mp2l_check_path: 
+beq $a0, $zero, mp2l_save_xloc
 
   la $t0, shield_time
   la $t1, pacman_contact
   lw $t0, ($t0)
   lw $t1, ($t1)
+  la $t3, shield_alert_time
+  lw $t3, ($t3)
+  sub $t0, $t0, $t3
+  la $t3, shield_alert_time
+  lw $t3, ($t3)
+  sub $t0, $t0, $t3
   sgt $t0, $t0, 0
   and $t0, $t1, $t0
   bne $t0, $zero, mp2l_no_move
-beq $a0, $zero, mp2l_save_xloc
     # check whether pacman's top-left corner is in a wall 
     addi $a0, $s0, 0
     addi $a1, $s1, 0
@@ -1338,6 +1416,10 @@ beq $a0, $zero, mp2l_save_xloc
     sw $t5, ($sp)
     jal check_intersection
     addi $sp, $sp, 32
+    la $t0, shield_time
+    lw $t0, ($t0)
+    seq $t0, $t0, 0
+    and $v0, $v0, $t0
     bne $v0, $zero, mp2l_no_move
     
 
@@ -1401,15 +1483,18 @@ move_pacman2_right:
     j mp2r_save_xloc
 
 mp2r_check_path: 
+beq $a0, $zero, mp2r_save_xloc
 
   la $t0, shield_time
   la $t1, pacman_contact
   lw $t0, ($t0)
   lw $t1, ($t1)
+  la $t3, shield_alert_time
+  lw $t3, ($t3)
+  sub $t0, $t0, $t3
   sgt $t0, $t0, 0
   and $t0, $t1, $t0
   bne $t0, $zero, mp2r_no_move
-beq $a0, $zero, mp2r_save_xloc
     # check whether pacman's top-right corner is in a wall
     add $a0, $s0, $s3 
     addi $a0, $a0, -1 # x-coordinate of pacman's right corners 
@@ -1447,6 +1532,10 @@ beq $a0, $zero, mp2r_save_xloc
     sw $t5, ($sp)
     jal check_intersection
     addi $sp, $sp, 32
+    la $t0, shield_time
+    lw $t0, ($t0)
+    seq $t0, $t0, 0
+    and $v0, $v0, $t0
     bne $v0, $zero, mp2r_no_move
 
 mp2r_save_xloc:  sw $s0, 0($s2) # save new x_loc
@@ -1514,7 +1603,17 @@ move_pacman_up:
   j mpu_save_yloc
 
 mpu_check_path: beq $a0, $zero, mpu_save_yloc
-  
+  la $t0, shield_time
+  la $t1, pacman_contact
+  lw $t0, ($t0)
+  lw $t1, ($t1)
+  la $t3, shield_alert_time
+  lw $t3, ($t3)
+  sub $t0, $t0, $t3
+  sgt $t0, $t0, 0
+  not $t1, $t1
+  and $t0, $t1, $t0
+  bne $t0, $zero, mpu_no_move
   # check whether pacman's top-left corner is in a wall 
   addi $a0, $s0, 0 #x
   addi $a1, $s1, 0 #y
@@ -1551,6 +1650,10 @@ mpu_check_path: beq $a0, $zero, mpu_save_yloc
     sw $t5, ($sp)
     jal check_intersection
     addi $sp, $sp, 32
+    la $t0, shield_time
+    lw $t0, ($t0)
+    seq $t0, $t0, 0
+    and $v0, $v0, $t0
     bne $v0, $zero, mpu_no_move
 
 mpu_save_yloc:  sw $s1, 4($s2) # save new y_loc
@@ -1618,6 +1721,18 @@ move_pacman_down:
     j mpd_save_yloc
 
 mpd_check_path: beq $a0, $zero, mpd_save_yloc
+
+  la $t0, shield_time
+  la $t1, pacman_contact
+  lw $t0, ($t0)
+  lw $t1, ($t1)
+  la $t3, shield_alert_time
+  lw $t3, ($t3)
+  sub $t0, $t0, $t3
+  sgt $t0, $t0, 0
+  not $t1, $t1
+  and $t0, $t1, $t0
+  bne $t0, $zero, mpd_no_move
     # check whether pacman's bottom-left corner is in a wall
     add $a1, $s1, $s4 
     addi $a1, $a1, -1 # y-coordinate of pacman's bottom corners 
@@ -1655,6 +1770,10 @@ mpd_check_path: beq $a0, $zero, mpd_save_yloc
     sw $t5, ($sp)
     jal check_intersection
     addi $sp, $sp, 32
+    la $t0, shield_time
+    lw $t0, ($t0)
+    seq $t0, $t0, 0
+    and $v0, $v0, $t0
     bne $v0, $zero, mpr_no_move
 
 mpd_save_yloc:  sw $s1, 4($s2) # save new y_loc
@@ -1719,6 +1838,17 @@ move_pacman_left:
     j mpl_save_xloc
 
 mpl_check_path: beq $a0, $zero, mpl_save_xloc
+  la $t0, shield_time
+  la $t1, pacman_contact
+  lw $t0, ($t0)
+  lw $t1, ($t1)
+  la $t3, shield_alert_time
+  lw $t3, ($t3)
+  sub $t0, $t0, $t3
+  sgt $t0, $t0, 0
+  not $t1, $t1
+  and $t0, $t1, $t0
+  bne $t0, $zero, mpl_no_move
     # check whether pacman's top-left corner is in a wall 
     addi $a0, $s0, 0
     addi $a1, $s1, 0
@@ -1755,6 +1885,10 @@ mpl_check_path: beq $a0, $zero, mpl_save_xloc
     sw $t5, ($sp)
     jal check_intersection
     addi $sp, $sp, 32
+    la $t0, shield_time
+    lw $t0, ($t0)
+    seq $t0, $t0, 0
+    and $v0, $v0, $t0
     bne $v0, $zero, mpl_no_move 
 
 mpl_save_xloc:  sw $s0, 0($s2) # save new x_loc
@@ -1817,6 +1951,17 @@ move_pacman_right:
     j mpr_save_xloc
 
 mpr_check_path: beq $a0, $zero, mpr_save_xloc
+  la $t0, shield_time
+  la $t1, pacman_contact
+  lw $t0, ($t0)
+  lw $t1, ($t1)
+  la $t3, shield_alert_time
+  lw $t3, ($t3)
+  sub $t0, $t0, $t3
+  sgt $t0, $t0, 0
+  not $t1, $t1
+  and $t0, $t1, $t0
+  bne $t0, $zero, mpr_no_move
     # check whether pacman's top-right corner is in a wall
     add $a0, $s0, $s3 
     addi $a0, $a0, -1 # x-coordinate of pacman's right corners 
@@ -1854,6 +1999,10 @@ mpr_check_path: beq $a0, $zero, mpr_save_xloc
     sw $t5, ($sp)
     jal check_intersection
     addi $sp, $sp, 32
+    la $t0, shield_time
+    lw $t0, ($t0)
+    seq $t0, $t0, 0
+    and $v0, $v0, $t0
     bne $v0, $zero, mpr_no_move
 
 mpr_save_xloc:  sw $s0, 0($s2) # save new x_loc
@@ -2175,8 +2324,6 @@ beq $s0, $zero, csc_exit # whether num <= 0
   lw $t2, ($t2) # sv of scorepoint
   add $a0, $t4, $t2
   sw $a0, ($t3)
-  li $v0, 203
-  syscall
 
 # *****Your codes end here
   
