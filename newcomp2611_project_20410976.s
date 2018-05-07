@@ -1057,7 +1057,7 @@ pqi_next:
   lw $a0, 0($t0)
   addi $a0, $a0, -1 # decrease one life
   sw $a0, 0($t0)
-  blez $a0, pqi_exit
+#  blez $a0, pqi_exit
 
   li $a0, 2 
   li $a1, 0
